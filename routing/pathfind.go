@@ -550,15 +550,16 @@ func findPath(g *graphParams, r *RestrictParams, source, target route.Vertex,
 				}
 			}
 
-			// Before we can process the edge, we'll need to fetch
-			// the node on the _other_ end of this channel as we
-			// may later need to iterate over the incoming edges of
-			// this node if we explore it further.
-			channelSource, err := edgeInfo.FetchOtherNode(
-				tx, pivot[:],
-			)
-			if err != nil {
-				return err
+			var channelSource *channeldb.LightningNode
+			if outEdge != nil {
+				channelSource = outEdge.Node
+			} else {
+				channelSource, err = edgeInfo.FetchOtherNode(
+					tx, pivot[:],
+				)
+				if err != nil {
+					return err
+				}
 			}
 
 			// Check if this candidate node is better than what we
