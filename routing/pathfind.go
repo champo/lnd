@@ -520,9 +520,9 @@ func findPath(g *graphParams, r *RestrictParams, source, target route.Vertex,
 		// examine all the incoming edges (channels) from this node to
 		// further our graph traversal.
 		pivot := route.Vertex(bestNode.PubKeyBytes)
-		err := bestNode.ForEachChannel(tx, func(tx *bbolt.Tx,
+		err := bestNode.ForEachChannelCached(g.graph.Database(), tx, func(tx *bbolt.Tx,
 			edgeInfo *channeldb.ChannelEdgeInfo,
-			_, inEdge *channeldb.ChannelEdgePolicy) error {
+			outEdge, inEdge *channeldb.ChannelEdgePolicy) error {
 
 			// If there is no edge policy for this candidate
 			// node, skip. Note that we are searching backwards

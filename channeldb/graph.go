@@ -2184,6 +2184,12 @@ func (c *ChannelGraph) HasLightningNode(nodePub [33]byte) (time.Time, bool, erro
 func (l *LightningNode) ForEachChannel(tx *bbolt.Tx,
 	cb func(*bbolt.Tx, *ChannelEdgeInfo, *ChannelEdgePolicy, *ChannelEdgePolicy) error) error {
 
+	return l.ForEachChannelCached(l.db, tx, cb)
+}
+
+func (l *LightningNode) ForEachChannelCached(db *DB, tx *bbolt.Tx,
+	cb func(*bbolt.Tx, *ChannelEdgeInfo, *ChannelEdgePolicy, *ChannelEdgePolicy) error) error {
+
 	nodePub := l.PubKeyBytes[:]
 
 	traversal := func(tx *bbolt.Tx) error {
@@ -2222,33 +2228,65 @@ func (l *LightningNode) ForEachChannel(tx *bbolt.Tx,
 			// the node at the other end of the channel and both
 			// edge policies.
 			chanID := nodeEdge[33:]
-			edgeInfo, err := fetchChanEdgeInfo(edgeIndex, chanID)
-			if err != nil {
-				return err
-			}
-			edgeInfo.db = l.db
+			intChanID := byteOrder.Uint64(chanID)
 
-			outgoingPolicy, err := fetchChanEdgePolicy(
-				edges, chanID, nodePub, nodes,
-			)
-			if err != nil {
-				return err
+			var channel *ChannelEdge
+			// db isn't assured to be present sadly
+			if db != nil {
+				// try to fetch the channel from cache
+				if ch, ok := db.graph.chanCache.get(intChanID); ok {
+					channel = &ch
+				}
 			}
 
-			otherNode, err := edgeInfo.OtherNodeKeyBytes(nodePub)
-			if err != nil {
-				return err
+			if channel == nil {
+
+				// generate the edge data if it's not cached
+				edgeInfo, err := fetchChanEdgeInfo(edgeIndex, chanID)
+				if err != nil {
+					return err
+				}
+				edgeInfo.db = l.db
+
+				edge1, edge2, err := fetchChanEdgePolicies(
+					edgeIndex, edges, nodes, chanID, db,
+				)
+				if err != nil {
+					return err
+				}
+
+				channel = &ChannelEdge{
+					Info:    &edgeInfo,
+					Policy1: edge1,
+					Policy2: edge2,
+				}
+
+				if db != nil {
+					// give back to the cache
+					db.graph.chanCache.insert(intChanID, *channel)
+				}
+
 			}
 
-			incomingPolicy, err := fetchChanEdgePolicy(
-				edges, chanID, otherNode, nodes,
-			)
-			if err != nil {
-				return err
+			var incomingPolicy, outgoingPolicy *ChannelEdgePolicy
+			if channel.Policy1 != nil && channel.Policy1.Node != nil {
+				if bytes.Equal(channel.Policy1.Node.PubKeyBytes[:], nodePub) {
+					incomingPolicy = channel.Policy1
+				} else {
+					outgoingPolicy = channel.Policy1
+				}
+			}
+
+			if channel.Policy2 != nil && channel.Policy2.Node != nil {
+				if bytes.Equal(channel.Policy2.Node.PubKeyBytes[:], nodePub) {
+					incomingPolicy = channel.Policy2
+				} else {
+					outgoingPolicy = channel.Policy2
+				}
 			}
 
 			// Finally, we execute the callback.
-			err = cb(tx, &edgeInfo, outgoingPolicy, incomingPolicy)
+			err := cb(tx, channel.Info, outgoingPolicy, incomingPolicy)
 			if err != nil {
 				return err
 			}
