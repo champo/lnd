@@ -283,7 +283,10 @@ func findPath(g *graphParams, r *RestrictParams, source, target route.Vertex,
 	// for the node set with a distance of "infinity". graph.ForEachNode
 	// also returns the source node, so there is no need to add the source
 	// node explicitly.
-	distance := make(map[route.Vertex]nodeWithDist)
+
+	// pre-allocating this heavily improves runtime
+	// FIXME: This should have an initial capacity same as the number of nodes
+	distance := make(map[route.Vertex]nodeWithDist, 6000)
 	if err := g.graph.ForEachNode(tx, func(_ *bbolt.Tx,
 		node *channeldb.LightningNode) error {
 		// TODO(roasbeef): with larger graph can just use disk seeks
