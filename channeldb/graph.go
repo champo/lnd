@@ -2191,7 +2191,6 @@ func (l *LightningNode) ForEachChannelCached(db *DB, tx *bbolt.Tx,
 	cb func(*bbolt.Tx, *ChannelEdgeInfo, *ChannelEdgePolicy, *ChannelEdgePolicy) error) error {
 
 	nodePub := l.PubKeyBytes[:]
-
 	traversal := func(tx *bbolt.Tx) error {
 		nodes := tx.Bucket(nodeBucket)
 		if nodes == nil {
@@ -2217,6 +2216,49 @@ func (l *LightningNode) ForEachChannelCached(db *DB, tx *bbolt.Tx,
 		copy(nodeStart[:], nodePub)
 		copy(nodeStart[33:], chanStart[:])
 
+		fetchChannel := func(chanID []byte) (*ChannelEdge, error) {
+
+			intChanID := byteOrder.Uint64(chanID)
+
+			// db isn't assured to be present sadly
+			if db != nil {
+				db.graph.cacheMu.Lock()
+				defer db.graph.cacheMu.Unlock()
+
+				// try to fetch the channel from cache
+				if ch, ok := db.graph.chanCache.get(intChanID); ok {
+					return &ch, nil
+				}
+			}
+
+			// generate the edge data if it's not cached
+			edgeInfo, err := fetchChanEdgeInfo(edgeIndex, chanID)
+			if err != nil {
+				return nil, err
+			}
+			edgeInfo.db = l.db
+
+			edge1, edge2, err := fetchChanEdgePolicies(
+				edgeIndex, edges, nodes, chanID, db,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			channel := &ChannelEdge{
+				Info:    &edgeInfo,
+				Policy1: edge1,
+				Policy2: edge2,
+			}
+
+			if db != nil {
+				// give back to the cache
+				db.graph.chanCache.insert(intChanID, *channel)
+			}
+
+			return channel, nil
+		}
+
 		// Starting from the key pubKey || 0, we seek forward in the
 		// bucket until the retrieved key no longer has the public key
 		// as its prefix. This indicates that we've stepped over into
@@ -2228,44 +2270,10 @@ func (l *LightningNode) ForEachChannelCached(db *DB, tx *bbolt.Tx,
 			// the node at the other end of the channel and both
 			// edge policies.
 			chanID := nodeEdge[33:]
-			intChanID := byteOrder.Uint64(chanID)
 
-			var channel *ChannelEdge
-			// db isn't assured to be present sadly
-			if db != nil {
-				// try to fetch the channel from cache
-				if ch, ok := db.graph.chanCache.get(intChanID); ok {
-					channel = &ch
-				}
-			}
-
-			if channel == nil {
-
-				// generate the edge data if it's not cached
-				edgeInfo, err := fetchChanEdgeInfo(edgeIndex, chanID)
-				if err != nil {
-					return err
-				}
-				edgeInfo.db = l.db
-
-				edge1, edge2, err := fetchChanEdgePolicies(
-					edgeIndex, edges, nodes, chanID, db,
-				)
-				if err != nil {
-					return err
-				}
-
-				channel = &ChannelEdge{
-					Info:    &edgeInfo,
-					Policy1: edge1,
-					Policy2: edge2,
-				}
-
-				if db != nil {
-					// give back to the cache
-					db.graph.chanCache.insert(intChanID, *channel)
-				}
-
+			channel, err := fetchChannel(chanID)
+			if err != nil {
+				return err
 			}
 
 			var incomingPolicy, outgoingPolicy *ChannelEdgePolicy
@@ -2286,7 +2294,7 @@ func (l *LightningNode) ForEachChannelCached(db *DB, tx *bbolt.Tx,
 			}
 
 			// Finally, we execute the callback.
-			err := cb(tx, channel.Info, outgoingPolicy, incomingPolicy)
+			err = cb(tx, channel.Info, outgoingPolicy, incomingPolicy)
 			if err != nil {
 				return err
 			}
