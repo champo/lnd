@@ -713,6 +713,8 @@ func waitForWalletPassword(grpcEndpoints, restEndpoints []net.Addr,
 	// Set up a new PasswordService, which will listen for passwords
 	// provided over RPC.
 	grpcServer := grpc.NewServer(serverOpts...)
+	// This server is not used outside this function
+	defer grpcServer.GracefulStop()
 
 	chainConfig := cfg.Bitcoin
 	if registeredChains.PrimaryChain() == litecoinChain {
