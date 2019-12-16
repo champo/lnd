@@ -788,7 +788,7 @@ func (s *Switch) handleLocalDispatch(pkt *htlcPacket) error {
 			log.Errorf("Link %v policy for local forward not "+
 				"satisfied: %v", pkt.outgoingChanID, htlcErr.Error())
 
-			return NewPaymentError(NewWireError(htlcErr), 0)
+			return NewPaymentError(htlcErr, 0)
 		}
 
 		return link.HandleSwitchPacket(pkt)
@@ -1019,18 +1019,23 @@ func (s *Switch) handlePacketForward(packet *htlcPacket) error {
 		// selection process. This way we can return the error for
 		// precise link that the sender selected, while optimistically
 		// trying all links to utilize our available bandwidth.
-		linkErrs := make(map[lnwire.ShortChannelID]lnwire.FailureMessage)
+		linkErrs := make(map[lnwire.ShortChannelID]LinkError)
 
 		// Try to find destination channel link with appropriate
 		// bandwidth.
 		var destination ChannelLink
 		for _, link := range interfaceLinks {
-			var failure lnwire.FailureMessage
+			var failure LinkError
 
 			// We'll skip any links that aren't yet eligible for
 			// forwarding.
 			if !link.EligibleToForward() {
-				failure = &lnwire.FailUnknownNextPeer{}
+				failure = newDetailError(
+					&lnwire.FailUnknownNextPeer{},
+					&FailureDetailLinkNotEligible{
+						ChannelID: link.ShortChanID(),
+					},
+				)
 			} else {
 				// We'll ensure that the HTLC satisfies the
 				// current forwarding conditions of this target
@@ -1065,7 +1070,10 @@ func (s *Switch) handlePacketForward(packet *htlcPacket) error {
 				// If we can't find the error of the source,
 				// then we'll return an unknown next peer,
 				// though this should never happen.
-				linkErr = &lnwire.FailUnknownNextPeer{}
+				linkErr = NewWireError(
+					&lnwire.FailUnknownNextPeer{},
+				)
+
 				log.Warnf("unable to find err source for "+
 					"outgoing_link=%v, errors=%v",
 					packet.outgoingChanID, newLogClosure(func() string {
@@ -1078,7 +1086,7 @@ func (s *Switch) handlePacketForward(packet *htlcPacket) error {
 				htlc.PaymentHash[:], packet.outgoingChanID,
 				linkErr)
 
-			return s.failAddPacket(packet, linkErr, addErr)
+			return s.failAddPacket(packet, linkErr.GetWireMessage(), addErr)
 		}
 
 		// Send the packet to the destination channel link which

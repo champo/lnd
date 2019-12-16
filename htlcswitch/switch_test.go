@@ -1290,7 +1290,7 @@ func TestSwitchForwardCircuitPersistence(t *testing.T) {
 type multiHopFwdTest struct {
 	name                 string
 	eligible1, eligible2 bool
-	failure1, failure2   lnwire.FailureMessage
+	failure1, failure2   LinkError
 	expectedReply        lnwire.FailCode
 }
 
@@ -1310,7 +1310,7 @@ func TestSkipIneligibleLinksMultiHopForward(t *testing.T) {
 		{
 			name:          "policy fail",
 			eligible1:     true,
-			failure1:      lnwire.NewFinalIncorrectCltvExpiry(0),
+			failure1:      NewWireError(lnwire.NewFinalIncorrectCltvExpiry(0)),
 			expectedReply: lnwire.CodeFinalIncorrectCltvExpiry,
 		},
 
@@ -1325,11 +1325,14 @@ func TestSkipIneligibleLinksMultiHopForward(t *testing.T) {
 		// The requested channel has insufficient bandwidth and the
 		// other channel's policy isn't satisfied.
 		{
-			name:          "non-strict policy fail",
-			eligible1:     true,
-			failure1:      lnwire.NewTemporaryChannelFailure(nil),
+			name:      "non-strict policy fail",
+			eligible1: true,
+			failure1: newDetailError(
+				lnwire.NewTemporaryChannelFailure(nil),
+				&FailureDetailInsufficientBalance{},
+			),
 			eligible2:     true,
-			failure2:      lnwire.NewFinalIncorrectCltvExpiry(0),
+			failure2:      NewWireError(lnwire.NewFinalIncorrectCltvExpiry(0)),
 			expectedReply: lnwire.CodeTemporaryChannelFailure,
 		},
 	}
@@ -1482,7 +1485,7 @@ func testSkipLinkLocalForward(t *testing.T, eligible bool,
 	aliceChannelLink := newMockChannelLink(
 		s, chanID1, aliceChanID, alicePeer, eligible,
 	)
-	aliceChannelLink.checkHtlcTransitResult = policyResult
+	aliceChannelLink.checkHtlcTransitResult = NewWireError(policyResult)
 	if err := s.AddLink(aliceChannelLink); err != nil {
 		t.Fatalf("unable to add alice link: %v", err)
 	}

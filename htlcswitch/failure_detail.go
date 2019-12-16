@@ -58,3 +58,47 @@ func (fd *FailureDetailOnChainTimeout) FailureString() string {
 	return fmt.Sprintf("payment was resolved on-chain, then canceled back "+
 		"(hash=%v, pid=%d)", fd.PaymentHash, fd.PaymentID)
 }
+
+// FailureDetailHTLCExceedsMax is returned when a htlc exceeds our policy's
+// maximum htlc amount.
+type FailureDetailHTLCExceedsMax struct{}
+
+// FailureString returns a string representation of a failure detail.
+//
+// Note it is part of the FailureDetail interface.
+func (fd *FailureDetailHTLCExceedsMax) FailureString() string {
+	return "htlc exceeds maximum policy value"
+}
+
+// FailureDetailInsufficientBalance is returned when we cannot route a
+// htlc due to insufficient outgoing capacity.
+type FailureDetailInsufficientBalance struct {
+	// Available is the current balance available in the channel.
+	Available lnwire.MilliSatoshi
+
+	// Amount is the amount that we could not forward.
+	Amount lnwire.MilliSatoshi
+}
+
+// FailureString returns a string representation of a failure detail.
+//
+// Note it is part FailureDetailInsufficientBalance the FailureDetail interface.
+func (fd *FailureDetailInsufficientBalance) FailureString() string {
+	return fmt.Sprintf("insufficient balance: %v for payment: %v",
+		fd.Available, fd.Amount)
+}
+
+// FailureDetailHTLCAddFailed is returned when we had an internal error adding
+// a htlc.
+type FailureDetailHTLCAddFailed struct {
+	// Err is the error that occurred when trying to add the htlc.
+	Err error
+}
+
+// FailureString returns a string representation of a failure detail.
+//
+// Note it is part of the FailureDetail interface.
+func (fd *FailureDetailHTLCAddFailed) FailureString() string {
+	return fmt.Sprintf("unable to handle downstream add "+
+		"HTLC: %v", fd.Err)
+}
