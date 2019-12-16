@@ -204,10 +204,21 @@ func TestSwitchSendPending(t *testing.T) {
 	// Send the ADD packet, this should not be forwarded out to the link
 	// since there are no eligible links.
 	err = s.forward(packet)
-	expErr := fmt.Sprintf("unable to find link with destination %v",
-		aliceChanID)
-	if err != nil && err.Error() != expErr {
-		t.Fatalf("expected forward failure: %v", err)
+	if err == nil {
+		t.Fatalf("expected an error, got nil")
+	}
+
+	// Check that the error returned is a link error.
+	linkErr, ok := err.(LinkError)
+	if !ok {
+		t.Fatalf("expected a LinkError, got: %T", err)
+	}
+
+	// Check that the wire message is for an unknown next peer.
+	_, ok = linkErr.GetWireMessage().(*lnwire.FailUnknownNextPeer)
+	if !ok {
+		t.Fatalf("expected a FailUnknownNextPeer, got: %T",
+			linkErr.GetWireMessage())
 	}
 
 	// No message should be sent, since the packet was failed.
@@ -1043,9 +1054,19 @@ func TestSwitchForwardFailAfterHalfAdd(t *testing.T) {
 	// Resend the failed htlc, it should be returned to alice since the
 	// switch will detect that it has been half added previously.
 	err = s2.forward(ogPacket)
-	if err != ErrIncompleteForward {
-		t.Fatal("unexpected error when reforwarding a "+
-			"failed packet", err)
+	if err == nil {
+		t.Fatalf("expected a forwarding error")
+	}
+
+	// Check that the error returned has incomplete forward as its metadata.
+	detail, ok := err.(*DetailError)
+	if !ok {
+		t.Fatalf("expected failure enriched with detail, got: %T", err)
+	}
+	_, ok = detail.FailureDetail.(*FailureDetailIncompleteForward)
+	if !ok {
+		t.Fatalf("expected FailureDetailIncompleteForward, got: %t",
+			detail.FailureDetail)
 	}
 
 	// After detecting an incomplete forward, the fail packet should have

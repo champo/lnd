@@ -45,11 +45,6 @@ var (
 	// through the switch and is locked into another commitment txn.
 	ErrDuplicateAdd = errors.New("duplicate add HTLC detected")
 
-	// ErrIncompleteForward is used when an htlc was already forwarded
-	// through the switch, but did not get locked into another commitment
-	// txn.
-	ErrIncompleteForward = errors.New("incomplete forward detected")
-
 	// ErrUnknownErrorDecryptor signals that we were unable to locate the
 	// error decryptor for this payment. This is likely due to restarting
 	// the daemon.
@@ -483,18 +478,19 @@ func (s *Switch) forward(packet *htlcPacket) error {
 				return err
 			}
 
-			var failure lnwire.FailureMessage
+			var failMsg lnwire.FailureMessage
 			update, err := s.cfg.FetchLastChannelUpdate(
 				packet.incomingChanID,
 			)
 			if err != nil {
-				failure = &lnwire.FailTemporaryNodeFailure{}
+				failMsg = &lnwire.FailTemporaryNodeFailure{}
 			} else {
-				failure = lnwire.NewTemporaryChannelFailure(update)
+				failMsg = lnwire.NewTemporaryChannelFailure(update)
 			}
-			addErr := ErrIncompleteForward
 
-			return s.failAddPacket(packet, failure, addErr)
+			failure := newDetailError(failMsg, &FailureDetailIncompleteForward{})
+
+			return s.failAddPacket(packet, failure)
 		}
 
 		packet.circuit = circuit
@@ -645,12 +641,13 @@ func (s *Switch) ForwardPackets(linkQuit chan struct{},
 		}
 
 		for _, packet := range failedPackets {
-			addErr := errors.New("failing packet after " +
-				"detecting incomplete forward")
+			linkErr := newDetailError(
+				failure, &FailureDetailIncompleteForward{},
+			)
 
 			// We don't handle the error here since this method
 			// always returns an error.
-			s.failAddPacket(packet, failure, addErr)
+			_ = s.failAddPacket(packet, linkErr)
 		}
 	}
 
@@ -985,10 +982,12 @@ func (s *Switch) handlePacketForward(packet *htlcPacket) error {
 		// Check if the node is set to reject all onward HTLCs and also make
 		// sure that HTLC is not from the source node.
 		if s.cfg.RejectHTLC && packet.incomingChanID != hop.Source {
-			failure := &lnwire.FailChannelDisabled{}
-			addErr := fmt.Errorf("unable to forward any htlcs")
 
-			return s.failAddPacket(packet, failure, addErr)
+			log.Error("unable to forward any htlcs")
+
+			return s.failAddPacket(
+				packet, NewWireError(&lnwire.FailChannelDisabled{}),
+			)
 		}
 
 		if packet.incomingChanID == hop.Source {
@@ -1005,11 +1004,11 @@ func (s *Switch) handlePacketForward(packet *htlcPacket) error {
 			// If packet was forwarded from another channel link
 			// than we should notify this link that some error
 			// occurred.
-			failure := &lnwire.FailUnknownNextPeer{}
-			addErr := fmt.Errorf("unable to find link with "+
+			failure := NewWireError(&lnwire.FailUnknownNextPeer{})
+			log.Errorf("unable to find link with "+
 				"destination %v", packet.outgoingChanID)
 
-			return s.failAddPacket(packet, failure, addErr)
+			return s.failAddPacket(packet, failure)
 		}
 		targetPeerKey := targetLink.Peer().PubKey()
 		interfaceLinks, _ := s.getLinks(targetPeerKey)
@@ -1081,12 +1080,12 @@ func (s *Switch) handlePacketForward(packet *htlcPacket) error {
 					}))
 			}
 
-			addErr := fmt.Errorf("incoming HTLC(%x) violated "+
+			log.Error("incoming HTLC(%x) violated "+
 				"target outgoing link (id=%v) policy: %v",
 				htlc.PaymentHash[:], packet.outgoingChanID,
 				linkErr)
 
-			return s.failAddPacket(packet, linkErr.GetWireMessage(), addErr)
+			return s.failAddPacket(packet, linkErr)
 		}
 
 		// Send the packet to the destination channel link which
@@ -1185,15 +1184,15 @@ func (s *Switch) handlePacketForward(packet *htlcPacket) error {
 }
 
 // failAddPacket encrypts a fail packet back to an add packet's source.
-// The ciphertext will be derived from the failure message proivded by context.
+// The ciphertext will be derived from the failure message provided by context.
 // This method returns the failErr if all other steps complete successfully.
 func (s *Switch) failAddPacket(packet *htlcPacket,
-	failure lnwire.FailureMessage, failErr error) error {
+	failure LinkError) error {
 
 	// Encrypt the failure so that the sender will be able to read the error
 	// message. Since we failed this packet, we use EncryptFirstHop to
 	// obfuscate the failure for their eyes only.
-	reason, err := packet.obfuscator.EncryptFirstHop(failure)
+	reason, err := packet.obfuscator.EncryptFirstHop(failure.GetWireMessage())
 	if err != nil {
 		err := fmt.Errorf("unable to obfuscate "+
 			"error: %v", err)
@@ -1201,7 +1200,7 @@ func (s *Switch) failAddPacket(packet *htlcPacket,
 		return err
 	}
 
-	log.Error(failErr)
+	log.Error(failure.Error())
 
 	failPkt := &htlcPacket{
 		sourceRef:      packet.sourceRef,
@@ -1223,7 +1222,7 @@ func (s *Switch) failAddPacket(packet *htlcPacket,
 		return err
 	}
 
-	return failErr
+	return failure
 }
 
 // closeCircuit accepts a settle or fail htlc and the associated htlc packet and

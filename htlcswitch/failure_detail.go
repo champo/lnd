@@ -102,3 +102,14 @@ func (fd *FailureDetailHTLCAddFailed) FailureString() string {
 	return fmt.Sprintf("unable to handle downstream add "+
 		"HTLC: %v", fd.Err)
 }
+
+// FailureDetailIncompleteForward is returned when we cancel an incomplete
+// forward.
+type FailureDetailIncompleteForward struct{}
+
+// FailureString returns a string representation of a failure detail.
+//
+// Note it is part of the FailureDetail interface.
+func (fd *FailureDetailIncompleteForward) FailureString() string {
+	return "failing packet after detecting incomplete forward"
+}
