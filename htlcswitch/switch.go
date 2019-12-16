@@ -1207,6 +1207,7 @@ func (s *Switch) failAddPacket(packet *htlcPacket,
 		incomingChanID: packet.incomingChanID,
 		incomingHTLCID: packet.incomingHTLCID,
 		circuit:        packet.circuit,
+		linkFailure:    failure,
 		htlc: &lnwire.UpdateFailHTLC{
 			Reason: reason,
 		},

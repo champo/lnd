@@ -1337,6 +1337,7 @@ func (l *channelLink) handleDownStreamPkt(pkt *htlcPacket, isReProcess bool) {
 					sourceRef:      pkt.sourceRef,
 					hasSource:      true,
 					localFailure:   localFailure,
+					linkFailure:    failure,
 					htlc: &lnwire.UpdateFailHTLC{
 						Reason: reason,
 					},

@@ -49,6 +49,11 @@ type htlcPacket struct {
 	// any forwarded errors in an additional layer of encryption.
 	obfuscator hop.ErrorEncrypter
 
+	// linkFailure is non-nil for payments that fail when leaving our node.
+	// This may occur for out own payments which fail on the outgoing link,
+	// or for forwards which fail in the switch or on the outgoing link.
+	linkFailure LinkError
+
 	// localFailure is set to true if an HTLC fails for a local payment before
 	// the first hop. In this case, the failure reason is simply encoded, not
 	// encrypted with any shared secret.
