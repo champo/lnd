@@ -1206,18 +1206,34 @@ func (l *channelLink) processHodlEvent(hodlEvent invoices.HodlEvent,
 	l.log.Debugf("failing hltc %v with update result: %v",
 		circuitKey, hodlEvent.ResolutionResult)
 
-	// The htlc has failed so we cancel it with FailIncorrectDetails. This
-	// error covers invoice failures and hodl cancels (which return it to avoid
-	// leaking information.
-	failure := lnwire.NewFailIncorrectDetails(
-		htlc.pd.Amount, uint32(hodlEvent.AcceptHeight),
-	)
+	// Get the lnwire failure message based on the hodl event's resolution
+	// result.
+	failure := getHodlFailureMessage(hodlEvent, htlc.pd.Amount)
 
 	l.sendHTLCError(
 		htlc.pd.HtlcIndex, failure, htlc.obfuscator,
 		htlc.pd.SourceRef,
 	)
 	return nil
+}
+
+// getHodlFailureMessage returns the wire message that a hodl event should be
+// failed with.
+func getHodlFailureMessage(event invoices.HodlEvent,
+	amount lnwire.MilliSatoshi) lnwire.FailureMessage {
+
+	// If the event has been resolved as part of a MPP timeout, we need to fail
+	// the htlc with lnwire.FailMppTimeout.
+	if event.ResolutionResult == invoices.ResultMPPTimeout {
+		return &lnwire.FailMPPTimeout{}
+	}
+
+	// If the htlc is not a MPP timeout, we fail it with FailIncorrectDetails
+	// This covers hodl cancels (which return it to avoid leaking information
+	// and other invoice failures such as underpayment or expiry too soon.
+	return lnwire.NewFailIncorrectDetails(
+		amount, uint32(event.AcceptHeight),
+	)
 }
 
 // randomFeeUpdateTimeout returns a random timeout between the bounds defined
