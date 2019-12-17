@@ -36,8 +36,17 @@ func (s *WireError) Error() string {
 	return s.Msg.Error()
 }
 
-// PaymentError wraps an lnwire.FailureMessage in a struct that also
-// includes the source of the error.
+// NewWireError returns a switch error which wraps the wire message provided.
+func NewWireError(msg lnwire.FailureMessage) LinkError {
+	return &WireError{
+		Msg: msg,
+	}
+}
+
+// PaymentError is used to signal that one of our own payments has failed,
+// either on our own outgoing link (source index=0) or further down the
+// router (non-zero source index). It embeds the LinkError interface so that
+// it may be used in the switch as a superset of LinkError.
 type PaymentError struct {
 	// FailureSourceIdx is the index of the node that sent the failure. With
 	// this information, the dispatcher of a payment can modify their set of
@@ -49,7 +58,9 @@ type PaymentError struct {
 	// order to provide context specific error details.
 	ExtraMsg string
 
-	lnwire.FailureMessage
+	// LinkError is an internal error which wraps a wire message with
+	// additional information.
+	LinkError
 }
 
 // Error implements the built-in error interface. We use this method to allow
@@ -58,23 +69,23 @@ type PaymentError struct {
 func (p *PaymentError) Error() string {
 	if p.ExtraMsg == "" {
 		return fmt.Sprintf(
-			"%v@%v", p.FailureMessage, p.FailureSourceIdx,
+			"%v@%v", p.GetWireMessage(), p.FailureSourceIdx,
 		)
 	}
 
 	return fmt.Sprintf(
-		"%v@%v: %v", p.FailureMessage, p.FailureSourceIdx, p.ExtraMsg,
+		"%v@%v: %v", p.GetWireMessage(), p.FailureSourceIdx, p.ExtraMsg,
 	)
 }
 
-// NewPaymentError creates a new payment error which wraps a wire error with
+// NewPaymentError creates a new payment error which wraps a link error with
 // additional metadata.
-func NewPaymentError(failure lnwire.FailureMessage, index int,
+func NewPaymentError(failure LinkError, index int,
 	extraMsg string) *PaymentError {
 
 	return &PaymentError{
 		FailureSourceIdx: index,
-		FailureMessage:   failure,
+		LinkError:        failure,
 		ExtraMsg:         extraMsg,
 	}
 }
@@ -133,10 +144,12 @@ func (s *SphinxErrorDecrypter) DecryptError(reason lnwire.OpaqueReason) (
 	r := bytes.NewReader(failure.Message)
 	failureMsg, err := lnwire.DecodeFailure(r, 0)
 	if err != nil {
-		return NewPaymentError(nil, failure.SenderIdx, ""), nil
+		return NewPaymentError(NewWireError(nil), failure.SenderIdx, ""), nil
 	}
 
-	return NewPaymentError(failureMsg, failure.SenderIdx, ""), nil
+	return NewPaymentError(
+		NewWireError(failureMsg), failure.SenderIdx, "",
+	), nil
 }
 
 // A compile time check to ensure ErrorDecrypter implements the Deobfuscator

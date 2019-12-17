@@ -1904,7 +1904,7 @@ func (r *ChannelRouter) processSendError(paymentID uint64, rt *route.Route,
 		return &internalErrorReason
 	}
 
-	failureMessage := fErr.FailureMessage
+	failureMessage := fErr.GetWireMessage()
 	failureSourceIdx := fErr.FailureSourceIdx
 
 	// Apply channel update if the error contains one. For unknown

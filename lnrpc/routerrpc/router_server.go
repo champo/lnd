@@ -331,7 +331,7 @@ func marshallError(sendError error) (*Failure, error) {
 		return nil, sendError
 	}
 
-	switch onionErr := fErr.FailureMessage.(type) {
+	switch onionErr := fErr.GetWireMessage().(type) {
 
 	case *lnwire.FailIncorrectDetails:
 		response.Code = Failure_INCORRECT_OR_UNKNOWN_PAYMENT_DETAILS

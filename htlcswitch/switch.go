@@ -757,7 +757,9 @@ func (s *Switch) handleLocalDispatch(pkt *htlcPacket) error {
 		if err != nil {
 			log.Errorf("Link %v not found", pkt.outgoingChanID)
 
-			return NewPaymentError(&lnwire.FailUnknownNextPeer{}, 0, "")
+			return NewPaymentError(
+				NewWireError(&lnwire.FailUnknownNextPeer{}), 0, "",
+			)
 		}
 
 		if !link.EligibleToForward() {
@@ -765,10 +767,12 @@ func (s *Switch) handleLocalDispatch(pkt *htlcPacket) error {
 				pkt.outgoingChanID)
 			log.Error(err)
 
+			// The update does not need to be populated as the error
+			// will be returned back to the router.
+			htlcErr := lnwire.NewTemporaryChannelFailure(nil)
+
 			return NewPaymentError(
-				// The update does not need to be populated as the error
-				// will be returned back to the router.
-				lnwire.NewTemporaryChannelFailure(nil), 0, err.Error(),
+				NewWireError(htlcErr), 0, err.Error(),
 			)
 		}
 
@@ -783,7 +787,7 @@ func (s *Switch) handleLocalDispatch(pkt *htlcPacket) error {
 			log.Errorf("Link %v policy for local forward not "+
 				"satisfied: %v", pkt.outgoingChanID, htlcErr.Error())
 
-			return NewPaymentError(htlcErr, 0, "")
+			return NewPaymentError(NewWireError(htlcErr), 0, "")
 		}
 
 		return link.HandleSwitchPacket(pkt)
@@ -922,7 +926,7 @@ func (s *Switch) parseFailedPayment(deobfuscator ErrorDecrypter,
 			failureMsg = lnwire.NewTemporaryChannelFailure(nil)
 		}
 
-		return NewPaymentError(failureMsg, 0, userErr)
+		return NewPaymentError(NewWireError(failureMsg), 0, userErr)
 
 	// A payment had to be timed out on chain before it got past
 	// the first hop. In this case, we'll report a permanent
@@ -933,7 +937,8 @@ func (s *Switch) parseFailedPayment(deobfuscator ErrorDecrypter,
 			"on-chain, then canceled back (hash=%v, pid=%d)",
 			paymentHash, paymentID)
 
-		return NewPaymentError(&lnwire.FailPermanentChannelFailure{}, 0, userErr)
+		linkErr := NewWireError(&lnwire.FailPermanentChannelFailure{})
+		return NewPaymentError(linkErr, 0, userErr)
 
 	// A regular multi-hop payment error that we'll need to
 	// decrypt.
