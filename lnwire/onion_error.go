@@ -80,6 +80,7 @@ const (
 	CodeFinalIncorrectHtlcAmount         FailCode = 19
 	CodeExpiryTooFar                     FailCode = 21
 	CodeInvalidOnionPayload                       = FlagPerm | 22
+	CodeMPPTimeout                       FailCode = 23
 )
 
 // String returns the string representation of the failure code.
@@ -1180,6 +1181,26 @@ func (f *InvalidOnionPayload) Encode(w io.Writer, pver uint32) error {
 	}
 
 	return WriteElements(w, f.Offset)
+}
+
+// FailMPPTimeout is returned if the complete amount for a multi part payment was
+// not received within a reasonable time.
+//
+// NOTE: May only be returned by the final node in the path.
+type FailMPPTimeout struct{}
+
+// Code returns the failure unique code.
+//
+// NOTE: Part of the FailureMessage interface.
+func (f *FailMPPTimeout) Code() FailCode {
+	return CodeMPPTimeout
+}
+
+// Returns a human readable string describing the target FailureMessage.
+//
+// NOTE: Implements the error interface.
+func (f *FailMPPTimeout) Error() string {
+	return f.Code().String()
 }
 
 // DecodeFailure decodes, validates, and parses the lnwire onion failure, for
