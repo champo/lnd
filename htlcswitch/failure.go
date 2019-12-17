@@ -40,6 +40,18 @@ func (p *PaymentError) Error() string {
 	)
 }
 
+// NewPaymentError creates a new payment error which wraps a wire error with
+// additional metadata.
+func NewPaymentError(failure lnwire.FailureMessage, index int,
+	extraMsg string) *PaymentError {
+
+	return &PaymentError{
+		FailureSourceIdx: index,
+		FailureMessage:   failure,
+		ExtraMsg:         extraMsg,
+	}
+}
+
 // ErrorDecrypter is an interface that is used to decrypt the onion encrypted
 // failure reason an extra out a well formed error.
 type ErrorDecrypter interface {
@@ -94,15 +106,10 @@ func (s *SphinxErrorDecrypter) DecryptError(reason lnwire.OpaqueReason) (
 	r := bytes.NewReader(failure.Message)
 	failureMsg, err := lnwire.DecodeFailure(r, 0)
 	if err != nil {
-		return &PaymentError{
-			FailureSourceIdx: failure.SenderIdx,
-		}, nil
+		return NewPaymentError(nil, failure.SenderIdx, ""), nil
 	}
 
-	return &PaymentError{
-		FailureSourceIdx: failure.SenderIdx,
-		FailureMessage:   failureMsg,
-	}, nil
+	return NewPaymentError(failureMsg, failure.SenderIdx, ""), nil
 }
 
 // A compile time check to ensure ErrorDecrypter implements the Deobfuscator

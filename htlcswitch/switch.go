@@ -756,25 +756,20 @@ func (s *Switch) handleLocalDispatch(pkt *htlcPacket) error {
 		s.indexMtx.RUnlock()
 		if err != nil {
 			log.Errorf("Link %v not found", pkt.outgoingChanID)
-			return &PaymentError{
-				FailureSourceIdx: 0,
-				FailureMessage:   &lnwire.FailUnknownNextPeer{},
-			}
+
+			return NewPaymentError(&lnwire.FailUnknownNextPeer{}, 0, "")
 		}
 
 		if !link.EligibleToForward() {
-			err := fmt.Errorf("Link %v is not available to forward",
+			err := fmt.Errorf("link %v is not available to forward",
 				pkt.outgoingChanID)
 			log.Error(err)
 
-			// The update does not need to be populated as the error
-			// will be returned back to the router.
-			htlcErr := lnwire.NewTemporaryChannelFailure(nil)
-			return &PaymentError{
-				FailureSourceIdx: 0,
-				ExtraMsg:         err.Error(),
-				FailureMessage:   htlcErr,
-			}
+			return NewPaymentError(
+				// The update does not need to be populated as the error
+				// will be returned back to the router.
+				lnwire.NewTemporaryChannelFailure(nil), 0, err.Error(),
+			)
 		}
 
 		// Ensure that the htlc satisfies the outgoing channel policy.
@@ -786,12 +781,9 @@ func (s *Switch) handleLocalDispatch(pkt *htlcPacket) error {
 		)
 		if htlcErr != nil {
 			log.Errorf("Link %v policy for local forward not "+
-				"satisfied", pkt.outgoingChanID)
+				"satisfied: %v", pkt.outgoingChanID, htlcErr.Error())
 
-			return &PaymentError{
-				FailureSourceIdx: 0,
-				FailureMessage:   htlcErr,
-			}
+			return NewPaymentError(htlcErr, 0, "")
 		}
 
 		return link.HandleSwitchPacket(pkt)
@@ -930,11 +922,7 @@ func (s *Switch) parseFailedPayment(deobfuscator ErrorDecrypter,
 			failureMsg = lnwire.NewTemporaryChannelFailure(nil)
 		}
 
-		return &PaymentError{
-			FailureSourceIdx: 0,
-			ExtraMsg:         userErr,
-			FailureMessage:   failureMsg,
-		}
+		return NewPaymentError(failureMsg, 0, userErr)
 
 	// A payment had to be timed out on chain before it got past
 	// the first hop. In this case, we'll report a permanent
@@ -945,11 +933,7 @@ func (s *Switch) parseFailedPayment(deobfuscator ErrorDecrypter,
 			"on-chain, then canceled back (hash=%v, pid=%d)",
 			paymentHash, paymentID)
 
-		return &PaymentError{
-			FailureSourceIdx: 0,
-			ExtraMsg:         userErr,
-			FailureMessage:   &lnwire.FailPermanentChannelFailure{},
-		}
+		return NewPaymentError(&lnwire.FailPermanentChannelFailure{}, 0, userErr)
 
 	// A regular multi-hop payment error that we'll need to
 	// decrypt.

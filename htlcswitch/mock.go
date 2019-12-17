@@ -400,10 +400,7 @@ func (o *mockDeobfuscator) DecryptError(reason lnwire.OpaqueReason) (*PaymentErr
 		return nil, err
 	}
 
-	return &PaymentError{
-		FailureSourceIdx: 1,
-		FailureMessage:   failure,
-	}, nil
+	return NewPaymentError(failure, 1, ""), nil
 }
 
 var _ ErrorDecrypter = (*mockDeobfuscator)(nil)
