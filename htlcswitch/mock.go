@@ -176,6 +176,7 @@ func initSwitchWithDB(startingHeight uint32, db *channeldb.DB) (*Switch, error) 
 		FwdEventTicker: ticker.NewForce(DefaultFwdEventInterval),
 		LogEventTicker: ticker.NewForce(DefaultLogInterval),
 		AckEventTicker: ticker.NewForce(DefaultAckInterval),
+		HTLCNotifier:   &mockHTLCNotifier{},
 	}
 
 	return New(cfg, startingHeight)
@@ -1008,4 +1009,23 @@ func (m *mockOnionErrorDecryptor) DecryptError(encryptedData []byte) (
 		SenderIdx: m.sourceIdx,
 		Message:   m.message,
 	}, m.err
+}
+
+var _ htlcNotifier = (*mockHTLCNotifier)(nil)
+
+type mockHTLCNotifier struct{}
+
+func (h *mockHTLCNotifier) NotifyForwardingEvent(pkt *htlcPacket,
+	hash lntypes.Hash) {
+}
+
+func (h *mockHTLCNotifier) NotifyLinkFailEvent(pkt *htlcPacket, hash lntypes.Hash,
+	eventType HTLCEventType, incomingFailed bool) {
+}
+
+func (h *mockHTLCNotifier) NotifyForwardingFailEvent(pkt *htlcPacket) {
+}
+
+func (h *mockHTLCNotifier) NotifySettleEvent(pkt *htlcPacket, hash lntypes.Hash,
+	eventType HTLCEventType) {
 }

@@ -1745,6 +1745,7 @@ func newSingleLinkTestHarness(chanAmt, chanReserve btcutil.Amount) (
 		MaxFeeAllocation:      DefaultMaxLinkFeeAllocation,
 		NotifyActiveChannel:   func(wire.OutPoint) {},
 		NotifyInactiveChannel: func(wire.OutPoint) {},
+		HTLCNotifier:          &mockHTLCNotifier{},
 	}
 
 	aliceLink := NewChannelLink(aliceCfg, aliceLc.channel)
@@ -4308,6 +4309,7 @@ func (h *persistentLinkHarness) restartLink(
 		MaxFeeAllocation:      DefaultMaxLinkFeeAllocation,
 		NotifyActiveChannel:   func(wire.OutPoint) {},
 		NotifyInactiveChannel: func(wire.OutPoint) {},
+		HTLCNotifier:          &mockHTLCNotifier{},
 	}
 
 	aliceLink := NewChannelLink(aliceCfg, aliceChannel)
@@ -5518,6 +5520,7 @@ func TestCheckHtlcForward(t *testing.T) {
 			},
 			FetchLastChannelUpdate: fetchLastChannelUpdate,
 			MaxOutgoingCltvExpiry:  DefaultMaxOutgoingCltvExpiry,
+			HTLCNotifier:           &mockHTLCNotifier{},
 		},
 		log:           log,
 		channel:       testChannel.channel,

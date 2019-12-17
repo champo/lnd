@@ -200,6 +200,8 @@ type SettleEvent struct {
 
 // NotifyForwardingEvent notifies the HTLCNotifier than a HTLC has been
 // forwarded.
+//
+// Note this is part of the Notifier interface.
 func (h *HTLCNotifier) NotifyForwardingEvent(pkt *htlcPacket, hash lntypes.Hash) {
 	// If the packet has a non-zero incoming channel ID, it is a forward.
 	// Sends that are forwarded from our node have zero incoming channels IDs
@@ -227,6 +229,8 @@ func (h *HTLCNotifier) NotifyForwardingEvent(pkt *htlcPacket, hash lntypes.Hash)
 
 // NotifyLinkFailEvent notifies the HTLCNotifier that we have failed a HTLC on
 // one of our links.
+//
+// Note this is part of the Notifier interface.
 func (h *HTLCNotifier) NotifyLinkFailEvent(pkt *htlcPacket, hash lntypes.Hash,
 	eventType HTLCEventType, incomingFailed bool) {
 
@@ -264,6 +268,8 @@ func (h *HTLCNotifier) NotifyLinkFailEvent(pkt *htlcPacket, hash lntypes.Hash,
 
 // NotifyForwardingFailEvent notifies the HTLCNotifier that a HTLC we forwarded
 // has failed down the line.
+//
+// Note this is part of the Notifier interface.
 func (h *HTLCNotifier) NotifyForwardingFailEvent(pkt *htlcPacket) {
 	// If the packet has a non-zero outgoing channel ID, it is a forward. Sends
 	// from our node that fail have zero outgoing channels IDs because we are
@@ -293,6 +299,8 @@ func (h *HTLCNotifier) NotifyForwardingFailEvent(pkt *htlcPacket) {
 
 // NotifySettleEvent notifies the HTLCNotifier that a HTLC that we committed to
 // as part of a forward or a receive to our node has been settled.
+//
+// Note this is part of the Notifier interface.
 func (h *HTLCNotifier) NotifySettleEvent(pkt *htlcPacket, hash lntypes.Hash,
 	eventType HTLCEventType) {
 

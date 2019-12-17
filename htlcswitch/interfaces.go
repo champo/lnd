@@ -180,3 +180,26 @@ type TowerClient interface {
 	// isTweakless should be true.
 	BackupState(*lnwire.ChannelID, *lnwallet.BreachRetribution, bool) error
 }
+
+// htlcNotifier is an interface which represents the input side of the
+// HTLCNotifier which htlc events are piped through. This interface is intended
+// to allow for mocking of the htlcNotifier in tests, so is unexported because
+// it is not needed outside of the htlcSwitch package.
+type htlcNotifier interface {
+	// NotifyForwardingEvent notifies the HTLCNotifier than a HTLC has been
+	// forwarded.
+	NotifyForwardingEvent(pkt *htlcPacket, hash lntypes.Hash)
+
+	// NotifyLinkFailEvent notifies the HTLCNotifier that we have failed a HTLC
+	// on one of our links.
+	NotifyLinkFailEvent(pkt *htlcPacket, hash lntypes.Hash,
+		eventType HTLCEventType, incomingFailed bool)
+
+	// NotifyForwardingFailEvent notifies the HTLCNotifier that a HTLC we
+	// forwarded has failed down the line.
+	NotifyForwardingFailEvent(pkt *htlcPacket)
+
+	// NotifySettleEvent notifies the HTLCNotifier that a HTLC that we committed
+	// to as part of a forward or a receive to our node has been settled.
+	NotifySettleEvent(pkt *htlcPacket, hash lntypes.Hash, eventType HTLCEventType)
+}
