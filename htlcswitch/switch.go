@@ -753,6 +753,13 @@ func (s *Switch) handleLocalDispatch(pkt *htlcPacket) error {
 	if htlc, ok := pkt.htlc.(*lnwire.UpdateAddHTLC); ok {
 		link, err := s.handleLocalAddHTLC(pkt, htlc)
 		if err != nil {
+			pkt.linkFailure = err
+
+			// Notify the htlc notifier of the link failure.
+			s.cfg.HTLCNotifier.NotifyLinkFailEvent(
+				pkt, htlc.PaymentHash, HTLCEventTypeSend, false,
+			)
+
 			return err
 		}
 
