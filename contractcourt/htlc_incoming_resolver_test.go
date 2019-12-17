@@ -35,7 +35,9 @@ func TestHtlcIncomingResolverFwdPreimageKnown(t *testing.T) {
 	defer timeout(t)()
 
 	ctx := newIncomingResolverTestContext(t)
-	ctx.registry.notifyErr = channeldb.ErrInvoiceNotFound
+	ctx.registry.notifyEvent = &invoices.HodlEvent{
+		ResolutionResult: invoices.ResultInvoiceNotFound,
+	}
 	ctx.witnessBeacon.lookupPreimage[testResHash] = testResPreimage
 	ctx.resolve()
 	ctx.waitForResult(true)
@@ -49,7 +51,9 @@ func TestHtlcIncomingResolverFwdContestedSuccess(t *testing.T) {
 	defer timeout(t)()
 
 	ctx := newIncomingResolverTestContext(t)
-	ctx.registry.notifyErr = channeldb.ErrInvoiceNotFound
+	ctx.registry.notifyEvent = &invoices.HodlEvent{
+		ResolutionResult: invoices.ResultInvoiceNotFound,
+	}
 	ctx.resolve()
 
 	// Simulate a new block coming in. HTLC is not yet expired.
@@ -66,7 +70,9 @@ func TestHtlcIncomingResolverFwdContestedTimeout(t *testing.T) {
 	defer timeout(t)()
 
 	ctx := newIncomingResolverTestContext(t)
-	ctx.registry.notifyErr = channeldb.ErrInvoiceNotFound
+	ctx.registry.notifyEvent = &invoices.HodlEvent{
+		ResolutionResult: invoices.ResultInvoiceNotFound,
+	}
 	ctx.resolve()
 
 	// Simulate a new block coming in. HTLC expires.
@@ -83,7 +89,9 @@ func TestHtlcIncomingResolverFwdTimeout(t *testing.T) {
 
 	ctx := newIncomingResolverTestContext(t)
 
-	ctx.registry.notifyErr = channeldb.ErrInvoiceNotFound
+	ctx.registry.notifyEvent = &invoices.HodlEvent{
+		ResolutionResult: invoices.ResultInvoiceNotFound,
+	}
 	ctx.witnessBeacon.lookupPreimage[testResHash] = testResPreimage
 	ctx.resolver.htlcExpiry = 90
 	ctx.resolve()
@@ -99,6 +107,7 @@ func TestHtlcIncomingResolverExitSettle(t *testing.T) {
 	ctx := newIncomingResolverTestContext(t)
 	ctx.registry.notifyEvent = invoices.NewHodlEvent(
 		&testResPreimage, testResCircuitKey, testAcceptHeight,
+		invoices.ResultReplayToSettled,
 	)
 
 	ctx.resolve()
@@ -129,6 +138,7 @@ func TestHtlcIncomingResolverExitCancel(t *testing.T) {
 	ctx := newIncomingResolverTestContext(t)
 	ctx.registry.notifyEvent = invoices.NewHodlEvent(
 		nil, testResCircuitKey, testAcceptHeight,
+		invoices.ResultReplayToCanceled,
 	)
 
 	ctx.resolve()
@@ -147,6 +157,7 @@ func TestHtlcIncomingResolverExitSettleHodl(t *testing.T) {
 	notifyData := <-ctx.registry.notifyChan
 	notifyData.hodlChan <- *invoices.NewHodlEvent(
 		&testResPreimage, testResCircuitKey, testAcceptHeight,
+		invoices.ResultInvoiceNotFound,
 	)
 
 	ctx.waitForResult(true)
@@ -175,6 +186,7 @@ func TestHtlcIncomingResolverExitCancelHodl(t *testing.T) {
 	notifyData := <-ctx.registry.notifyChan
 	notifyData.hodlChan <- *invoices.NewHodlEvent(
 		nil, testResCircuitKey, testAcceptHeight,
+		invoices.ResultInvoiceNotFound,
 	)
 
 	ctx.waitForResult(false)

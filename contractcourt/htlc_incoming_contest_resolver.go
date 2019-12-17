@@ -205,17 +205,19 @@ func (h *htlcIncomingContestResolver) Resolve() (ContractResolver, error) {
 		h.htlc.RHash, h.htlc.Amt, h.htlcExpiry, currentHeight,
 		circuitKey, hodlChan, payload,
 	)
-	switch err {
-	case channeldb.ErrInvoiceNotFound:
-	case nil:
-		defer h.Registry.HodlUnsubscribeAll(hodlChan)
-
-		// Resolve the htlc directly if possible.
-		if event != nil {
-			return processHodlEvent(*event)
-		}
-	default:
+	if err != nil {
 		return nil, err
+	}
+
+	defer h.Registry.HodlUnsubscribeAll(hodlChan)
+
+	// If the event is non-nil, and the invoice is known to the registry
+	// (indicating that the htlc is not a forward), try to resolve the htlc
+	// directly.
+	if event != nil &&
+		event.ResolutionResult != invoices.ResultInvoiceNotFound {
+
+		return processHodlEvent(*event)
 	}
 
 	// With the epochs and preimage subscriptions initialized, we'll query

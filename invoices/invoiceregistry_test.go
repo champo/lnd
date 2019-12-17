@@ -81,15 +81,21 @@ func TestSettleInvoice(t *testing.T) {
 		t.Fatalf("expected acceptHeight %v, but got %v",
 			testCurrentHeight, event.AcceptHeight)
 	}
+	if event.ResolutionResult != ResultExpiryTooSoon {
+		t.Fatalf("expected expiry too soon, got: %v", event.ResolutionResult)
+	}
 
 	// Settle invoice with a slightly higher amount.
 	amtPaid := lnwire.MilliSatoshi(100500)
-	_, err = ctx.registry.NotifyExitHopHtlc(
+	event, err = ctx.registry.NotifyExitHopHtlc(
 		testInvoicePaymentHash, amtPaid, testHtlcExpiry, testCurrentHeight,
 		getCircuitKey(0), hodlChan, testPayload,
 	)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if event.ResolutionResult != ResultSettled {
+		t.Fatalf("expected settled, got: %v", event.ResolutionResult)
 	}
 
 	// We expect the settled state to be sent to the single invoice
@@ -130,6 +136,9 @@ func TestSettleInvoice(t *testing.T) {
 	if event.Preimage == nil {
 		t.Fatal("expected settle event")
 	}
+	if event.ResolutionResult != ResultReplayToSettled {
+		t.Fatalf("expected replay settled, got: %v", event.ResolutionResult)
+	}
 
 	// Try to settle again with a new higher-valued htlc. This payment
 	// should also be accepted, to prevent any change in behaviour for a
@@ -144,6 +153,9 @@ func TestSettleInvoice(t *testing.T) {
 	if event.Preimage == nil {
 		t.Fatal("expected settle event")
 	}
+	if event.ResolutionResult != ResultDuplicateToSettled {
+		t.Fatalf("expected duplicate settled, got: %v", event.ResolutionResult)
+	}
 
 	// Try to settle again with a lower amount. This should fail just as it
 	// would have failed if it were the first payment.
@@ -155,7 +167,10 @@ func TestSettleInvoice(t *testing.T) {
 		t.Fatalf("unexpected NotifyExitHopHtlc error: %v", err)
 	}
 	if event.Preimage != nil {
-		t.Fatal("expected cancel event")
+		t.Fatal("expected failed settle")
+	}
+	if event.ResolutionResult != ResultAmountTooLow {
+		t.Fatalf("expected amount too low, got: %v", event.ResolutionResult)
 	}
 
 	// Check that settled amount is equal to the sum of values of the htlcs
@@ -287,6 +302,9 @@ func TestCancelInvoice(t *testing.T) {
 		t.Fatalf("expected acceptHeight %v, but got %v",
 			testCurrentHeight, event.AcceptHeight)
 	}
+	if event.ResolutionResult != ResultInvoiceAlreadyCanceled {
+		t.Fatalf("expected invoice already cancelled, got: %v", event.ResolutionResult)
+	}
 }
 
 // TestSettleHoldInvoice tests settling of a hold invoice and related
@@ -402,6 +420,9 @@ func TestSettleHoldInvoice(t *testing.T) {
 	if event == nil || event.Preimage != nil {
 		t.Fatalf("expected htlc to be canceled")
 	}
+	if event.ResolutionResult != ResultExpiryTooSoon {
+		t.Fatalf("expected expiry too soon, got: %v", event.ResolutionResult)
+	}
 
 	// We expect the accepted state to be sent to the single invoice
 	// subscriber. For all invoice subscribers, we don't expect an update.
@@ -428,6 +449,10 @@ func TestSettleHoldInvoice(t *testing.T) {
 	if hodlEvent.AcceptHeight != testCurrentHeight {
 		t.Fatalf("expected acceptHeight %v, but got %v",
 			testCurrentHeight, event.AcceptHeight)
+	}
+	if hodlEvent.ResolutionResult != ResultSettled {
+		t.Fatalf("expected result settled, got: %v",
+			hodlEvent.ResolutionResult)
 	}
 
 	// We expect a settled notification to be sent out for both all and
@@ -535,6 +560,9 @@ func TestCancelHoldInvoice(t *testing.T) {
 		t.Fatalf("expected acceptHeight %v, but got %v",
 			testCurrentHeight, event.AcceptHeight)
 	}
+	if event.ResolutionResult != ResultReplayToCanceled {
+		t.Fatalf("expected replay to cancelled, got %v", event.ResolutionResult)
+	}
 }
 
 // TestUnknownInvoice tests that invoice registry returns an error when the
@@ -550,17 +578,22 @@ func TestUnknownInvoice(t *testing.T) {
 	// succeed.
 	hodlChan := make(chan interface{})
 	amt := lnwire.MilliSatoshi(100000)
-	_, err := ctx.registry.NotifyExitHopHtlc(
+	result, err := ctx.registry.NotifyExitHopHtlc(
 		testInvoicePaymentHash, amt, testHtlcExpiry, testCurrentHeight,
 		getCircuitKey(0), hodlChan, testPayload,
 	)
-	if err != channeldb.ErrInvoiceNotFound {
-		t.Fatal("expected invoice not found error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.ResolutionResult != ResultInvoiceNotFound {
+		t.Fatal("expected invoice not found")
 	}
 }
 
-// TestSettleMpp tests settling of an invoice with multiple partial payments.
-func TestSettleMpp(t *testing.T) {
+// TestMppPayment tests settling of an invoice with multiple partial payments.
+// It covers the case where there is a mpp timeout before the whole invoice is
+// paid and the case where the invoice is settled in time.
+func TestMppPayment(t *testing.T) {
 	defer timeout()()
 
 	ctx := newTestContext(t)
@@ -597,6 +630,9 @@ func TestSettleMpp(t *testing.T) {
 	if hodlEvent.Preimage != nil {
 		t.Fatal("expected cancel event")
 	}
+	if hodlEvent.ResolutionResult != ResultMPPTimeout {
+		t.Fatalf("expected mpp timeout, got: %v", hodlEvent.ResolutionResult)
+	}
 
 	// Send htlc 2.
 	hodlChan2 := make(chan interface{}, 1)
@@ -625,9 +661,12 @@ func TestSettleMpp(t *testing.T) {
 	if event == nil {
 		t.Fatal("expected a settle event")
 	}
+	if event.ResolutionResult != ResultSettled {
+		t.Fatalf("expected resultSettled, got: %v", event.ResolutionResult)
+	}
 
 	// Check that settled amount is equal to the sum of values of the htlcs
-	// 0 and 1.
+	// 2 and 3.
 	inv, err := ctx.registry.LookupInvoice(testInvoicePaymentHash)
 	if err != nil {
 		t.Fatal(err)

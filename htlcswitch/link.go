@@ -1192,7 +1192,8 @@ func (l *channelLink) processHodlEvent(hodlEvent invoices.HodlEvent,
 
 	circuitKey := hodlEvent.CircuitKey
 
-	// Determine required action for the resolution.
+	// Determine required action for the resolution. If the event's preimage is
+	// non-nil, the htlc must be settled. Otherwise, it should be cancelled.
 	if hodlEvent.Preimage != nil {
 		l.log.Debugf("received hodl settle event for %v", circuitKey)
 
@@ -1202,10 +1203,12 @@ func (l *channelLink) processHodlEvent(hodlEvent invoices.HodlEvent,
 		)
 	}
 
-	l.log.Debugf("received hodl cancel event for %v", circuitKey)
+	l.log.Debugf("failing hltc %v with update result: %v",
+		circuitKey, hodlEvent.ResolutionResult)
 
-	// In case of a cancel, always return
-	// incorrect_or_unknown_payment_details in order to avoid leaking info.
+	// The htlc has failed so we cancel it with FailIncorrectDetails. This
+	// error covers invoice failures and hodl cancels (which return it to avoid
+	// leaking information.
 	failure := lnwire.NewFailIncorrectDetails(
 		htlc.pd.Amount, uint32(hodlEvent.AcceptHeight),
 	)
@@ -2817,21 +2820,7 @@ func (l *channelLink) processExitHop(pd *lnwallet.PaymentDescriptor,
 		invoiceHash, pd.Amount, pd.Timeout, int32(heightNow),
 		circuitKey, l.hodlQueue.ChanIn(), payload,
 	)
-
-	switch err {
-
-	// Cancel htlc if we don't have an invoice for it.
-	case channeldb.ErrInvoiceNotFound:
-		failure := lnwire.NewFailIncorrectDetails(pd.Amount, heightNow)
-		l.sendHTLCError(pd.HtlcIndex, failure, obfuscator, pd.SourceRef)
-
-		return nil
-
-	// No error.
-	case nil:
-
-	// Pass error to caller.
-	default:
+	if err != nil {
 		return err
 	}
 
@@ -2841,10 +2830,10 @@ func (l *channelLink) processExitHop(pd *lnwallet.PaymentDescriptor,
 		obfuscator: obfuscator,
 	}
 
+	// If the event is nil, the invoice is being held, so we save payment
+	// descriptor for future reference.
 	if event == nil {
-		// Save payment descriptor for future reference.
 		l.hodlMap[circuitKey] = htlc
-
 		return nil
 	}
 
