@@ -2178,7 +2178,7 @@ func TestUpdateFailMalformedHTLCErrorConversion(t *testing.T) {
 			t.Fatalf("unable to send payment: %v", err)
 		}
 
-		fwdingErr := err.(*ForwardingError)
+		fwdingErr := err.(*PaymentError)
 		failureMsg := fwdingErr.FailureMessage
 		if _, ok := failureMsg.(*lnwire.FailInvalidOnionKey); !ok {
 			t.Fatalf("expected onion failure instead got: %v",
@@ -2441,9 +2441,9 @@ func TestInvalidFailure(t *testing.T) {
 
 	select {
 	case result := <-resultChan:
-		fErr, ok := result.Error.(*ForwardingError)
+		fErr, ok := result.Error.(*PaymentError)
 		if !ok {
-			t.Fatal("expected ForwardingError")
+			t.Fatal("expected PaymentError")
 		}
 		if fErr.FailureSourceIdx != 2 {
 			t.Fatal("unexpected error source index")

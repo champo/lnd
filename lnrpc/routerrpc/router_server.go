@@ -326,7 +326,7 @@ func marshallError(sendError error) (*Failure, error) {
 		return response, nil
 	}
 
-	fErr, ok := sendError.(*htlcswitch.ForwardingError)
+	fErr, ok := sendError.(*htlcswitch.PaymentError)
 	if !ok {
 		return nil, sendError
 	}

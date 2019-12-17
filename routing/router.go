@@ -1899,7 +1899,7 @@ func (r *ChannelRouter) processSendError(paymentID uint64, rt *route.Route,
 	}
 	// If an internal, non-forwarding error occurred, we can stop
 	// trying.
-	fErr, ok := sendErr.(*htlcswitch.ForwardingError)
+	fErr, ok := sendErr.(*htlcswitch.PaymentError)
 	if !ok {
 		return &internalErrorReason
 	}

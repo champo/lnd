@@ -756,7 +756,7 @@ func (s *Switch) handleLocalDispatch(pkt *htlcPacket) error {
 		s.indexMtx.RUnlock()
 		if err != nil {
 			log.Errorf("Link %v not found", pkt.outgoingChanID)
-			return &ForwardingError{
+			return &PaymentError{
 				FailureSourceIdx: 0,
 				FailureMessage:   &lnwire.FailUnknownNextPeer{},
 			}
@@ -770,7 +770,7 @@ func (s *Switch) handleLocalDispatch(pkt *htlcPacket) error {
 			// The update does not need to be populated as the error
 			// will be returned back to the router.
 			htlcErr := lnwire.NewTemporaryChannelFailure(nil)
-			return &ForwardingError{
+			return &PaymentError{
 				FailureSourceIdx: 0,
 				ExtraMsg:         err.Error(),
 				FailureMessage:   htlcErr,
@@ -788,7 +788,7 @@ func (s *Switch) handleLocalDispatch(pkt *htlcPacket) error {
 			log.Errorf("Link %v policy for local forward not "+
 				"satisfied", pkt.outgoingChanID)
 
-			return &ForwardingError{
+			return &PaymentError{
 				FailureSourceIdx: 0,
 				FailureMessage:   htlcErr,
 			}
@@ -930,7 +930,7 @@ func (s *Switch) parseFailedPayment(deobfuscator ErrorDecrypter,
 			failureMsg = lnwire.NewTemporaryChannelFailure(nil)
 		}
 
-		return &ForwardingError{
+		return &PaymentError{
 			FailureSourceIdx: 0,
 			ExtraMsg:         userErr,
 			FailureMessage:   failureMsg,
@@ -945,7 +945,7 @@ func (s *Switch) parseFailedPayment(deobfuscator ErrorDecrypter,
 			"on-chain, then canceled back (hash=%v, pid=%d)",
 			paymentHash, paymentID)
 
-		return &ForwardingError{
+		return &PaymentError{
 			FailureSourceIdx: 0,
 			ExtraMsg:         userErr,
 			FailureMessage:   &lnwire.FailPermanentChannelFailure{},

@@ -9,9 +9,9 @@ import (
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
-// ForwardingError wraps an lnwire.FailureMessage in a struct that also
+// PaymentError wraps an lnwire.FailureMessage in a struct that also
 // includes the source of the error.
-type ForwardingError struct {
+type PaymentError struct {
 	// FailureSourceIdx is the index of the node that sent the failure. With
 	// this information, the dispatcher of a payment can modify their set of
 	// candidate routes in response to the type of failure extracted. Index
@@ -28,15 +28,15 @@ type ForwardingError struct {
 // Error implements the built-in error interface. We use this method to allow
 // the switch or any callers to insert additional context to the error message
 // returned.
-func (f *ForwardingError) Error() string {
-	if f.ExtraMsg == "" {
+func (p *PaymentError) Error() string {
+	if p.ExtraMsg == "" {
 		return fmt.Sprintf(
-			"%v@%v", f.FailureMessage, f.FailureSourceIdx,
+			"%v@%v", p.FailureMessage, p.FailureSourceIdx,
 		)
 	}
 
 	return fmt.Sprintf(
-		"%v@%v: %v", f.FailureMessage, f.FailureSourceIdx, f.ExtraMsg,
+		"%v@%v: %v", p.FailureMessage, p.FailureSourceIdx, p.ExtraMsg,
 	)
 }
 
@@ -47,7 +47,7 @@ type ErrorDecrypter interface {
 	// hop, to the source of the error. A fully populated
 	// lnwire.FailureMessage is returned along with the source of the
 	// error.
-	DecryptError(lnwire.OpaqueReason) (*ForwardingError, error)
+	DecryptError(lnwire.OpaqueReason) (*PaymentError, error)
 }
 
 // UnknownEncrypterType is an error message used to signal that an unexpected
@@ -82,7 +82,7 @@ type SphinxErrorDecrypter struct {
 //
 // NOTE: Part of the ErrorDecrypter interface.
 func (s *SphinxErrorDecrypter) DecryptError(reason lnwire.OpaqueReason) (
-	*ForwardingError, error) {
+	*PaymentError, error) {
 
 	failure, err := s.OnionErrorDecrypter.DecryptError(reason)
 	if err != nil {
@@ -94,12 +94,12 @@ func (s *SphinxErrorDecrypter) DecryptError(reason lnwire.OpaqueReason) (
 	r := bytes.NewReader(failure.Message)
 	failureMsg, err := lnwire.DecodeFailure(r, 0)
 	if err != nil {
-		return &ForwardingError{
+		return &PaymentError{
 			FailureSourceIdx: failure.SenderIdx,
 		}, nil
 	}
 
-	return &ForwardingError{
+	return &PaymentError{
 		FailureSourceIdx: failure.SenderIdx,
 		FailureMessage:   failureMsg,
 	}, nil
