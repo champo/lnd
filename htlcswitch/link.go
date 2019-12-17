@@ -1214,7 +1214,7 @@ func (l *channelLink) processHodlEvent(hodlEvent invoices.HodlEvent,
 	// result.
 	failure := getHodlFailureMessage(hodlEvent, htlc.pd.Amount)
 
-	l.sendHTLCError(htlc.pd, failure, htlc.obfuscator)
+	l.sendHTLCError(htlc.pd, failure, htlc.obfuscator, true)
 	return nil
 }
 
@@ -2654,7 +2654,7 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 			failure := NewWireError(
 				lnwire.NewInvalidOnionPayload(failedType, 0))
 
-			l.sendHTLCError(pd, failure, obfuscator)
+			l.sendHTLCError(pd, failure, obfuscator, false)
 
 			l.log.Errorf("unable to decode forwarding "+
 				"instructions: %v", err)
@@ -2766,7 +2766,7 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 
 				l.log.Errorf(failure.Error())
 
-				l.sendHTLCError(pd, failure, obfuscator)
+				l.sendHTLCError(pd, failure, obfuscator, false)
 				continue
 			}
 
@@ -2849,7 +2849,7 @@ func (l *channelLink) processExitHop(pd *lnwallet.PaymentDescriptor,
 			pd.Amount, fwdInfo.AmountToForward)
 
 		failure := NewWireError(lnwire.NewFinalIncorrectHtlcAmount(pd.Amount))
-		l.sendHTLCError(pd, failure, obfuscator)
+		l.sendHTLCError(pd, failure, obfuscator, true)
 
 		return nil
 	}
@@ -2864,7 +2864,7 @@ func (l *channelLink) processExitHop(pd *lnwallet.PaymentDescriptor,
 		failure := NewWireError(
 			lnwire.NewFinalIncorrectCltvExpiry(pd.Timeout),
 		)
-		l.sendHTLCError(pd, failure, obfuscator)
+		l.sendHTLCError(pd, failure, obfuscator, true)
 
 		return nil
 	}
@@ -2981,13 +2981,34 @@ func (l *channelLink) handleBatchFwdErrs(errChan chan error) {
 // sendHTLCError functions cancels HTLC and send cancel message back to the
 // peer from which HTLC was received.
 func (l *channelLink) sendHTLCError(pd *lnwallet.PaymentDescriptor,
-	failure LinkError, e hop.ErrorEncrypter) {
+	failure LinkError, e hop.ErrorEncrypter, isReceive bool) {
 
 	reason, err := e.EncryptFirstHop(failure.GetWireMessage())
 	if err != nil {
 		l.log.Errorf("unable to obfuscate error: %v", err)
 		return
 	}
+
+	// If the failed htlc was a receive for our node, set its event type.
+	eventType := HTLCEventTypeForward
+	if isReceive {
+		eventType = HTLCEventTypeReceive
+	}
+
+	// Notify a link failure on our incoming link. Outgoing HTLC information
+	// is not available at this point, because we have not decrypted the onion,
+	// so it is excluded.
+	l.cfg.HTLCNotifier.NotifyLinkFailEvent(&htlcPacket{
+		incomingChanID:  l.shortChanID,
+		incomingHTLCID:  pd.HtlcIndex,
+		incomingAmount:  pd.Amount,
+		incomingTimeout: pd.Timeout,
+		linkFailure:     failure,
+	},
+		lntypes.Hash(pd.RHash),
+		eventType,
+		true,
+	)
 
 	err = l.channel.FailHTLC(pd.HtlcIndex, reason, pd.SourceRef, nil, nil)
 	if err != nil {
