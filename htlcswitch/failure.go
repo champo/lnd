@@ -9,6 +9,33 @@ import (
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
+// LinkError is an interface which wraps lnwire failure messages for
+// internal use within the switch. This interface is intended to create a
+// barrier between the switch and wire.
+type LinkError interface {
+	GetWireMessage() lnwire.FailureMessage
+	error
+}
+
+// WireError wraps a wire message for use within the switch.
+type WireError struct {
+	Msg lnwire.FailureMessage
+}
+
+// GetWireMessage unwraps a WireError to obtain a wire message.
+//
+// Note this is part of the LinkError interface.
+func (s *WireError) GetWireMessage() lnwire.FailureMessage {
+	return s.Msg
+}
+
+// Error returns an error string for a switch failure.
+//
+// Note this is part of the LinkError interface.
+func (s *WireError) Error() string {
+	return s.Msg.Error()
+}
+
 // PaymentError wraps an lnwire.FailureMessage in a struct that also
 // includes the source of the error.
 type PaymentError struct {
