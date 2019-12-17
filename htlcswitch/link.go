@@ -1376,6 +1376,9 @@ func (l *channelLink) handleDownStreamPkt(pkt *htlcPacket, isReProcess bool) {
 		pkt.outgoingHTLCID = index
 		htlc.ID = index
 
+		// Send a forward event notification to htlcNotifier.
+		l.cfg.HTLCNotifier.NotifyForwardingEvent(pkt, htlc.PaymentHash)
+
 		l.log.Debugf("queueing keystone of ADD open circuit: %s->%s",
 			pkt.inKey(), pkt.outKey())
 
@@ -1437,6 +1440,11 @@ func (l *channelLink) handleDownStreamPkt(pkt *htlcPacket, isReProcess bool) {
 		htlc.ChanID = l.ChanID()
 		htlc.ID = pkt.incomingHTLCID
 
+		// Send a settle event notification to htlcNotifier.
+		l.cfg.HTLCNotifier.NotifySettleEvent(
+			pkt, sha256.Sum256(htlc.PaymentPreimage[:]), HTLCEventTypeForward,
+		)
+
 		// Then we send the HTLC settle message to the connected peer
 		// so we can continue the propagation of the settle message.
 		l.cfg.Peer.SendMessage(false, htlc)
@@ -1494,6 +1502,22 @@ func (l *channelLink) handleDownStreamPkt(pkt *htlcPacket, isReProcess bool) {
 		// within the switch.
 		htlc.ChanID = l.ChanID()
 		htlc.ID = pkt.incomingHTLCID
+
+		// If there was not a link failure, notify a forwarding failure event.
+		// Otherwise, the failure originated from our node, so should we should
+		// notify a link failure.
+		if pkt.linkFailure == nil {
+			l.cfg.HTLCNotifier.NotifyForwardingFailEvent(pkt)
+		} else {
+			eventType := HTLCEventTypeSend
+			if pkt.outgoingChanID.ToUint64() != 0 {
+				eventType = HTLCEventTypeForward
+			}
+
+			l.cfg.HTLCNotifier.NotifyLinkFailEvent(
+				pkt, lntypes.Hash{}, eventType, false,
+			)
+		}
 
 		// Finally, we send the HTLC message to the peer which
 		// initially created the HTLC.
