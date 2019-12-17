@@ -293,7 +293,7 @@ func TestSendPaymentRouteFailureFallback(t *testing.T) {
 					&lnwire.FailTemporaryChannelFailure{},
 				)
 
-				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1, "")
+				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1)
 			}
 
 			return preImage, nil
@@ -427,7 +427,7 @@ func TestChannelUpdateValidation(t *testing.T) {
 				},
 			)
 
-			return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1, "")
+			return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1)
 		})
 
 	// The payment parameter is mostly redundant in SendToRoute. Can be left
@@ -550,7 +550,7 @@ func TestSendPaymentErrorRepeatedFeeInsufficient(t *testing.T) {
 					},
 				)
 
-				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1, "")
+				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1)
 			}
 
 			return preImage, nil
@@ -651,7 +651,7 @@ func TestSendPaymentErrorNonFinalTimeLockErrors(t *testing.T) {
 					},
 				)
 
-				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1, "")
+				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1)
 			}
 
 			return preImage, nil
@@ -706,7 +706,7 @@ func TestSendPaymentErrorNonFinalTimeLockErrors(t *testing.T) {
 					},
 				)
 
-				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1, "")
+				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1)
 			}
 
 			return preImage, nil
@@ -768,7 +768,7 @@ func TestSendPaymentErrorPathPruning(t *testing.T) {
 					&lnwire.FailTemporaryChannelFailure{},
 				)
 
-				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1, "")
+				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1)
 			}
 
 			// Next, we'll create an error from phan nuwen to
@@ -779,7 +779,7 @@ func TestSendPaymentErrorPathPruning(t *testing.T) {
 					&lnwire.FailUnknownNextPeer{},
 				)
 
-				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1, "")
+				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1)
 			}
 
 			return preImage, nil
@@ -812,7 +812,7 @@ func TestSendPaymentErrorPathPruning(t *testing.T) {
 					&lnwire.FailUnknownNextPeer{},
 				)
 
-				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1, "")
+				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1)
 			}
 
 			return preImage, nil
@@ -859,7 +859,7 @@ func TestSendPaymentErrorPathPruning(t *testing.T) {
 					&lnwire.FailTemporaryChannelFailure{},
 				)
 
-				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1, "")
+				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1)
 			}
 			return preImage, nil
 		})
@@ -2547,7 +2547,7 @@ func TestUnknownErrorSource(t *testing.T) {
 				// the failure could not be decoded. Setting
 				linkErr := htlcswitch.NewWireError(nil)
 
-				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1, "")
+				return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 1)
 			}
 
 			// Otherwise the payment succeeds.
@@ -3114,7 +3114,7 @@ func TestRouterPaymentStateMachine(t *testing.T) {
 				case sendResult <- htlcswitch.NewPaymentError(
 					htlcswitch.NewWireError(
 						&lnwire.FailTemporaryChannelFailure{},
-					), 1, "",
+					), 1,
 				):
 				case <-time.After(1 * time.Second):
 					t.Fatalf("unable to send result")
@@ -3139,9 +3139,7 @@ func TestRouterPaymentStateMachine(t *testing.T) {
 				expectedError := htlcswitch.NewPaymentError(
 					htlcswitch.NewWireError(
 						&lnwire.FailTemporaryChannelFailure{},
-					), 1, "",
-				)
-
+					), 1)
 				select {
 				case getPaymentResult <- &htlcswitch.PaymentResult{
 					Error: expectedError,
@@ -3317,7 +3315,7 @@ func TestSendToRouteStructuredError(t *testing.T) {
 					Update: lnwire.ChannelUpdate{},
 				},
 			)
-			return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 0, "")
+			return [32]byte{}, htlcswitch.NewPaymentError(linkErr, 0)
 		})
 
 	// The payment parameter is mostly redundant in SendToRoute. Can be left
