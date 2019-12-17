@@ -50,6 +50,17 @@ type HodlEvent struct {
 	AcceptHeight int32
 }
 
+// NewHodlEvent returns a new hodl event with the values specified.
+func NewHodlEvent(preimage *lntypes.Preimage, key channeldb.CircuitKey,
+	acceptHeight int32) *HodlEvent {
+
+	return &HodlEvent{
+		Preimage:     preimage,
+		CircuitKey:   key,
+		AcceptHeight: acceptHeight,
+	}
+}
+
 // RegistryConfig contains the configuration parameters for invoice registry.
 type RegistryConfig struct {
 	// FinalCltvRejectDelta defines the number of blocks before the expiry
@@ -652,11 +663,9 @@ func (i *InvoiceRegistry) cancelSingleHtlc(hash lntypes.Hash,
 		return fmt.Errorf("htlc %v not found", key)
 	}
 	if htlc.State == channeldb.HtlcStateCanceled {
-		i.notifyHodlSubscribers(HodlEvent{
-			CircuitKey:   key,
-			AcceptHeight: int32(htlc.AcceptHeight),
-			Preimage:     nil,
-		})
+		i.notifyHodlSubscribers(
+			*NewHodlEvent(nil, key, int32(htlc.AcceptHeight)),
+		)
 	}
 	return nil
 }
@@ -745,10 +754,7 @@ func (i *InvoiceRegistry) NotifyExitHopHtlc(rHash lntypes.Hash,
 
 	// If it isn't recorded, cancel htlc.
 	if !ok {
-		return &HodlEvent{
-			CircuitKey:   circuitKey,
-			AcceptHeight: currentHeight,
-		}, nil
+		return NewHodlEvent(nil, circuitKey, currentHeight), nil
 	}
 
 	// Determine accepted height of this htlc. If the htlc reached the
@@ -759,10 +765,7 @@ func (i *InvoiceRegistry) NotifyExitHopHtlc(rHash lntypes.Hash,
 
 	switch invoiceHtlc.State {
 	case channeldb.HtlcStateCanceled:
-		return &HodlEvent{
-			CircuitKey:   circuitKey,
-			AcceptHeight: acceptHeight,
-		}, nil
+		return NewHodlEvent(nil, circuitKey, acceptHeight), nil
 
 	case channeldb.HtlcStateSettled:
 		// Also settle any previously accepted htlcs. The invoice state
@@ -773,18 +776,14 @@ func (i *InvoiceRegistry) NotifyExitHopHtlc(rHash lntypes.Hash,
 				continue
 			}
 
-			i.notifyHodlSubscribers(HodlEvent{
-				CircuitKey:   key,
-				Preimage:     &invoice.Terms.PaymentPreimage,
-				AcceptHeight: int32(htlc.AcceptHeight),
-			})
+			i.notifyHodlSubscribers(
+				*NewHodlEvent(&invoice.Terms.PaymentPreimage, key, acceptHeight),
+			)
 		}
 
-		return &HodlEvent{
-			CircuitKey:   circuitKey,
-			Preimage:     &invoice.Terms.PaymentPreimage,
-			AcceptHeight: acceptHeight,
-		}, nil
+		return NewHodlEvent(
+			&invoice.Terms.PaymentPreimage, circuitKey, acceptHeight,
+		), nil
 
 	case channeldb.HtlcStateAccepted:
 		// (Re)start the htlc timer if the invoice is still open. It can
@@ -854,11 +853,9 @@ func (i *InvoiceRegistry) SettleHodlInvoice(preimage lntypes.Preimage) error {
 			continue
 		}
 
-		i.notifyHodlSubscribers(HodlEvent{
-			CircuitKey:   key,
-			Preimage:     &preimage,
-			AcceptHeight: int32(htlc.AcceptHeight),
-		})
+		i.notifyHodlSubscribers(
+			*NewHodlEvent(&preimage, key, int32(htlc.AcceptHeight)),
+		)
 	}
 	i.notifyClients(hash, invoice, invoice.State)
 
@@ -932,10 +929,10 @@ func (i *InvoiceRegistry) cancelInvoiceImpl(payHash lntypes.Hash,
 			continue
 		}
 
-		i.notifyHodlSubscribers(HodlEvent{
-			CircuitKey:   key,
-			AcceptHeight: int32(htlc.AcceptHeight),
-		})
+		i.notifyHodlSubscribers(
+			*NewHodlEvent(nil, key, int32(htlc.AcceptHeight)),
+		)
+
 	}
 	i.notifyClients(payHash, invoice, channeldb.ContractCanceled)
 
