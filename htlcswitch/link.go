@@ -1201,6 +1201,17 @@ func (l *channelLink) processHodlEvent(hodlEvent invoices.HodlEvent,
 	if hodlEvent.Preimage != nil {
 		l.log.Debugf("received hodl settle event for %v", circuitKey)
 
+		l.cfg.HTLCNotifier.NotifySettleEvent(
+			// Settles for our own receives only have incoming information.
+			&htlcPacket{
+				incomingChanID:  l.shortChanID,
+				incomingHTLCID:  htlc.pd.HtlcIndex,
+				incomingAmount:  htlc.pd.Amount,
+				incomingTimeout: htlc.pd.Timeout,
+			},
+			lntypes.Hash(htlc.pd.RHash), HTLCEventTypeReceive,
+		)
+
 		return l.settleHTLC(
 			*hodlEvent.Preimage, htlc.pd.HtlcIndex,
 			htlc.pd.SourceRef,
