@@ -1,7 +1,6 @@
 package htlcswitch
 
 import (
-	"github.com/btcsuite/btcd/wire"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnpeer"
@@ -76,9 +75,6 @@ type ChannelLink interface {
 	// NOTE: This function MUST be non-blocking (or block as little as
 	// possible).
 	HandleChannelUpdate(lnwire.Message)
-
-	// ChannelPoint returns the channel outpoint for the channel link.
-	ChannelPoint() *wire.OutPoint
 
 	// ChanID returns the channel ID for the channel link. The channel ID
 	// is a more compact representation of a channel's full outpoint.

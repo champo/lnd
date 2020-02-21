@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package virtualchannelsrpc;
+
+option go_package = "github.com/lightningnetwork/lnd/lnrpc/virtualchannelsrpc";
+
+// Invoices is a service that can be used to create, accept, settle and cancel
+// invoices.
+service VirtualChannels {
+    rpc CreateVirtualChannel (CreateVirtualChannelRequest) returns (CreateVirtualChannelResponse);
+
+    rpc SubscribeVirtualForward (SubscribeVirtualForwardRequest) returns (stream VirtualForward);
+
+    rpc SettleVirtualForward (SettleVirtualForwardRequest) returns (SettleVirtualForwardResponse);
+
+    rpc DeleteVirtualChannel (DeleteVirtualChannelRequest) returns (DeleteVirtualChannelResponse);
+
+    rpc ListVirtualChannels (ListVirtualChannelsRequest) returns (ListVirtualChannelsResponse);
+}
+
+message CreateVirtualChannelRequest {
+    bytes node_pub_key = 1;
+    bytes channel_id = 2;
+}
+message CreateVirtualChannelResponse {}
+
+message SubscribeVirtualForwardRequest {}
+message VirtualForward {
+    bytes channel_id = 1;
+    bytes htlc = 2;
+    int64 timeout = 3;
+}
+
+message SettleVirtualForwardRequest {
+    bytes channel_id = 1;
+    bytes preimage = 2;
+}
+message SettleVirtualForwardResponse {}
+
+message DeleteVirtualChannelRequest {
+    bytes node_pub_key = 1;
+    bytes channel_id = 2;
+}
+message DeleteVirtualChannelResponse {}
+
+message ListVirtualChannelsRequest {}
+message ListVirtualChannelsResponse {
+    repeated VirtualChannel channels = 1;
+}
+
+message VirtualChannel {
+    bytes node_pub_key = 1;
+    bytes channel_id = 2;
+}

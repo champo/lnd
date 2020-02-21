@@ -15,6 +15,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc/invoicesrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/routerrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/signrpc"
+	"github.com/lightningnetwork/lnd/lnrpc/virtualchannelsrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/walletrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/watchtowerrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/wtclientrpc"
@@ -72,6 +73,8 @@ type subRPCServerConfigs struct {
 	// instance within lnd in order to add, remove, list registered client
 	// towers, etc.
 	WatchtowerClientRPC *wtclientrpc.Config `group:"wtclientrpc" namespace:"wtclientrpc"`
+
+	VirtualChannelsRPC *virtualchannelsrpc.Config `group:"virtualchannelsrpc" namespace:"virtualchannelsrpc"`
 }
 
 // PopulateDependencies attempts to iterate through all the sub-server configs
@@ -258,6 +261,19 @@ func (s *subRPCServerConfigs) PopulateDependencies(cc *chainControl,
 			}
 			subCfgValue.FieldByName("Resolver").Set(
 				reflect.ValueOf(tcpResolver),
+			)
+
+		case *virtualchannelsrpc.Config:
+			subCfgValue := extractReflectValue(subCfg)
+
+			subCfgValue.FieldByName("NetworkDir").Set(
+				reflect.ValueOf(networkDir),
+			)
+			subCfgValue.FieldByName("MacService").Set(
+				reflect.ValueOf(macService),
+			)
+			subCfgValue.FieldByName("Switch").Set(
+				reflect.ValueOf(htlcSwitch),
 			)
 
 		default:
