@@ -37,4 +37,6 @@ type RoutingConfig struct {
 	// MaxMcHistory defines the maximum number of payment results that
 	// are held on disk by mission control.
 	MaxMcHistory int `long:"maxmchistory" description:"the maximum number of payment results that are held on disk by mission control"`
+
+	AlwaysIntercept bool `long:"alwaysintercept" description:"Whether to always intercept HTLCs, even if no stream is attached"`
 }

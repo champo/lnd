@@ -121,6 +121,8 @@ type Server struct {
 	shutdown                 int32 // To be used atomically.
 	forwardInterceptorActive int32 // To be used atomically.
 
+	forwardInterceptor *forwardInterceptor
+
 	cfg *Config
 
 	quit chan struct{}
@@ -197,6 +199,9 @@ func (s *Server) Start() error {
 	if atomic.AddInt32(&s.started, 1) != 1 {
 		return nil
 	}
+
+	s.forwardInterceptor = newForwardInterceptor(s)
+	s.forwardInterceptor.start()
 
 	return nil
 }
@@ -635,6 +640,5 @@ func (s *Server) HtlcInterceptor(stream Router_HtlcInterceptorServer) error {
 	}
 	defer atomic.CompareAndSwapInt32(&s.forwardInterceptorActive, 1, 0)
 
-	// run the forward interceptor.
-	return newForwardInterceptor(s, stream).run()
+	return s.forwardInterceptor.attachStream(stream)
 }
